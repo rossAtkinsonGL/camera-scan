@@ -150,9 +150,11 @@ export function CameraCapture({
   });
 
   // Auto-capture: fire after N consecutive good frames, then wait for the sheet to be
-  // taken away (or a different QR code to appear) before arming again.
+  // taken away (or a different QR code to appear) before arming again. A sheet whose QR
+  // code is already in this session is never captured automatically (the guide says so).
   useEffect(() => {
     if (!autoOn || !cameraWanted || !ready) return;
+    if (live.qr && itemsRef.current.some((i) => i.result.qr === live.qr)) return;
     if (live.notReadyTicks >= REARM_TICKS) armedRef.current = true;
     if (live.qr && live.qr !== lastQrRef.current) armedRef.current = true;
     if (armedRef.current && live.readyTicks >= AUTO_TICKS) {
@@ -196,13 +198,18 @@ export function CameraCapture({
     </button>
   );
 
+  // The sheet in view has already been captured in this session.
+  const duplicate = !!live.qr && items.some((i) => i.result.qr === live.qr);
+
   const tray = items.length > 0 && maxCaptures !== 1 && (
     <ul className="cs-tray" aria-label="Captured sheets">
       {items.map((item, index) => (
         <li key={item.result.id}>
           <button
             type="button"
-            className={`cs-thumb ${item.result.quality?.ok ? 'cs-thumb-ok' : 'cs-thumb-warn'}`}
+            className={`cs-thumb ${item.result.quality?.ok ? 'cs-thumb-ok' : 'cs-thumb-warn'}${
+              duplicate && item.result.qr === live.qr ? ' cs-thumb-match' : ''
+            }`}
             onClick={() => setViewingId(item.result.id)}
             aria-label={`Sheet ${index + 1}${item.result.qr ? `, ${item.result.qr}` : ''}, ${
               item.result.quality?.ok ? 'passed checks' : 'has warnings'
@@ -254,18 +261,21 @@ export function CameraCapture({
   const markers = report?.metrics.markers;
   const guide = !ready
     ? null
-    : !report
-      ? 'Looking for the sheet…'
-      : report.ok
-        ? autoOn
-          ? 'Hold steady…'
-          : 'Ready'
-        : ISSUE_MESSAGES[report.issues[0]];
-  const progress = autoOn && report?.ok ? Math.min(1, live.readyTicks / AUTO_TICKS) : 0;
+    : duplicate
+      ? `Already scanned: ${live.qr}. Show a different sheet, or remove it below to scan it again.`
+      : !report
+        ? 'Looking for the sheet…'
+        : report.ok
+          ? autoOn
+            ? 'Hold steady…'
+            : 'Ready'
+          : ISSUE_MESSAGES[report.issues[0]];
+  const progress = autoOn && report?.ok && !duplicate ? Math.min(1, live.readyTicks / AUTO_TICKS) : 0;
+  const stageState = !(expectSheet && ready) ? '' : duplicate ? 'dup' : report?.ok ? 'ok' : 'warn';
 
   return (
     <div className={rootClass}>
-      <div className={`cs-stage ${expectSheet && ready ? (report?.ok ? 'cs-stage-ok' : 'cs-stage-warn') : ''}`}>
+      <div className={`cs-stage ${stageState ? `cs-stage-${stageState}` : ''}`}>
         {/* playsInline + muted are required for inline playback on iOS Safari */}
         <video ref={videoRef} className="cs-media" playsInline muted autoPlay hidden={status === 'error'} />
         {markers && live.frame && (
@@ -276,7 +286,7 @@ export function CameraCapture({
             aria-hidden="true"
           >
             <polygon
-              className={report?.ok ? 'cs-quad cs-quad-ok' : 'cs-quad cs-quad-warn'}
+              className={`cs-quad cs-quad-${stageState || 'warn'}`}
               points={markers.corners.map((p) => `${p.x},${p.y}`).join(' ')}
             />
           </svg>
@@ -288,7 +298,7 @@ export function CameraCapture({
           </p>
         )}
         {guide && expectSheet && (
-          <p className={`cs-guide ${report?.ok ? 'cs-guide-ok' : ''}`} role="status">
+          <p className={`cs-guide ${duplicate ? 'cs-guide-dup' : report?.ok ? 'cs-guide-ok' : ''}`} role="status">
             {guide}
           </p>
         )}

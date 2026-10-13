@@ -221,3 +221,19 @@
   margin: 0;
   color: #15803d;
 }
+
+/* Sheet already captured in this session */
+.cs-stage-dup {
+  border-color: #2563eb;
+}
+.cs-quad-dup {
+  stroke: #3b82f6;
+  fill: rgba(59, 130, 246, 0.12);
+}
+.cs-guide-dup {
+  background: rgba(29, 78, 216, 0.9);
+}
+.cs-thumb-match {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+}
