@@ -44,6 +44,8 @@ interface Item {
 const AUTO_TICKS = 5;
 /** Consecutive failing frames before the same sheet can be auto-captured again. */
 const REARM_TICKS = 3;
+/** How long the "scanned" confirmation stays on screen. */
+const ADDED_MS = 2200;
 
 let idCounter = 0;
 const makeId = () => `${Date.now().toString(36)}-${idCounter++}`;
@@ -65,6 +67,9 @@ export function CameraCapture({
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Brief confirmation after a sheet is added, shown over the camera view.
+  const [added, setAdded] = useState<{ text: string; ok: boolean } | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const itemsRef = useRef(items);
@@ -95,6 +100,7 @@ export function CameraCapture({
   useEffect(
     () => () => {
       itemsRef.current.forEach((i) => URL.revokeObjectURL(i.url));
+      clearTimeout(addedTimer.current);
     },
     [],
   );
@@ -117,6 +123,24 @@ export function CameraCapture({
     const item = { result, url: URL.createObjectURL(result.blob) };
     itemsRef.current = [...itemsRef.current, item];
     setItems(itemsRef.current);
+    confirmAdded(result, itemsRef.current.length);
+  };
+
+  const confirmAdded = (result: CaptureResult, count: number) => {
+    const issue = result.quality && !result.quality.ok ? result.quality.issues[0] : undefined;
+    setAdded({
+      text: issue
+        ? `Added, but check it: ${ISSUE_MESSAGES[issue]}`
+        : `Scanned ✓ ${result.qr ?? 'sheet'} (${count} captured)`,
+      ok: !issue,
+    });
+    clearTimeout(addedTimer.current);
+    addedTimer.current = setTimeout(() => setAdded(null), ADDED_MS);
+    try {
+      navigator.vibrate?.(60); // a small buzz on phones that support it
+    } catch {
+      // not available; the on-screen message is enough
+    }
   };
 
   const removeItem = (id: string) => {
@@ -259,19 +283,35 @@ export function CameraCapture({
 
   const report = live.report;
   const markers = report?.metrics.markers;
+  // What to tell the user, most urgent first.
   const guide = !ready
     ? null
-    : duplicate
-      ? `Already scanned: ${live.qr}. Show a different sheet, or remove it below to scan it again.`
-      : !report
-        ? 'Looking for the sheet…'
-        : report.ok
-          ? autoOn
-            ? 'Hold steady…'
-            : 'Ready'
-          : ISSUE_MESSAGES[report.issues[0]];
-  const progress = autoOn && report?.ok && !duplicate ? Math.min(1, live.readyTicks / AUTO_TICKS) : 0;
-  const stageState = !(expectSheet && ready) ? '' : duplicate ? 'dup' : report?.ok ? 'ok' : 'warn';
+    : added
+      ? added.text
+      : busy
+        ? 'Scanning…'
+        : duplicate
+          ? `Already scanned: ${live.qr}. Show a different sheet, or remove it below to scan it again.`
+          : !report
+            ? 'Looking for the sheet…'
+            : report.ok
+              ? autoOn
+                ? 'Hold steady…'
+                : 'Ready'
+              : ISSUE_MESSAGES[report.issues[0]];
+  const quiet = !!added || busy || duplicate;
+  const progress = autoOn && report?.ok && !quiet ? Math.min(1, live.readyTicks / AUTO_TICKS) : 0;
+  const stageState = !(expectSheet && ready)
+    ? ''
+    : added
+      ? added.ok
+        ? 'ok'
+        : 'warn'
+      : duplicate
+        ? 'dup'
+        : report?.ok
+          ? 'ok'
+          : 'warn';
 
   return (
     <div className={rootClass}>
@@ -298,7 +338,7 @@ export function CameraCapture({
           </p>
         )}
         {guide && expectSheet && (
-          <p className={`cs-guide ${duplicate ? 'cs-guide-dup' : report?.ok ? 'cs-guide-ok' : ''}`} role="status">
+          <p className={`cs-guide ${added ? (added.ok ? 'cs-guide-ok' : '') : duplicate ? 'cs-guide-dup' : report?.ok ? 'cs-guide-ok' : ''}`} role="status">
             {guide}
           </p>
         )}
