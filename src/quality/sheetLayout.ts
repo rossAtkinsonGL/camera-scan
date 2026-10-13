@@ -11,7 +11,7 @@ export const SHEET = {
   width: 210,
   height: 297,
   bracket: { arm: 14, thickness: 3, inset: 10 },
-  qr: { x: 146, y: 12, size: 36 },
+  qr: { x: 136, y: 12, size: 46 },
 } as const;
 
 export interface Rect {

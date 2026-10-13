@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ANALYSIS_SIZE, QR_SIZE, createCanvas, grabFrame } from './quality/browser';
+import { ANALYSIS_SIZE, createCanvas, decodeQrNearSheet, grabFrame } from './quality/browser';
 import { evaluate, measure, type EvaluateOptions, type QualityReport } from './quality/evaluate';
 import { frameDifference, toLuma } from './quality/image';
 import { detectMarkers } from './quality/markers';
-import { decodeQr } from './quality/qr';
 
 export interface LiveAnalysis {
   report: QualityReport | null;
@@ -65,8 +64,15 @@ export function useLiveAnalysis(
 
           // QR decoding is the most expensive step, so only try now and then, and only once the sheet is in view.
           if (markers && tick % QR_EVERY_N_TICKS === 0) {
-            const big = grabFrame(video, video.videoWidth, video.videoHeight, QR_SIZE, large);
-            const decoded = big ? decodeQr(big) : null;
+            const decoded = decodeQrNearSheet(
+              video,
+              video.videoWidth,
+              video.videoHeight,
+              markers,
+              frame.width,
+              frame.height,
+              large,
+            );
             if (decoded) {
               qr = decoded;
               qrSeenAt = performance.now();

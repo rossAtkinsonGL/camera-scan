@@ -243,3 +243,47 @@ export function detectMarkers(luma: Uint8Array, width: number, height: number): 
   }
   return best;
 }
+
+export interface FrameRegion {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+function bilinear(c: Point[], u: number, v: number): Point {
+  return {
+    x: (1 - u) * (1 - v) * c[0].x + u * (1 - v) * c[1].x + u * v * c[2].x + (1 - u) * v * c[3].x,
+    y: (1 - u) * (1 - v) * c[0].y + u * (1 - v) * c[1].y + u * v * c[2].y + (1 - u) * v * c[3].y,
+  };
+}
+
+/**
+ * Where the QR code could be, given the sheet outline: one box per possible turn of the sheet
+ * (the brackets alone cannot tell which way up it is). Coordinates are in the analysed frame.
+ */
+export function qrSearchRegions(corners: MarkerResult['corners'], width: number, height: number): FrameRegion[] {
+  const { inset } = SHEET.bracket;
+  const spanX = SHEET.width - 2 * inset;
+  const spanY = SHEET.height - 2 * inset;
+  const u0 = (SHEET.qr.x - inset) / spanX;
+  const u1 = (SHEET.qr.x + SHEET.qr.size - inset) / spanX;
+  const v0 = (SHEET.qr.y - inset) / spanY;
+  const v1 = (SHEET.qr.y + SHEET.qr.size - inset) / spanY;
+  const regions: FrameRegion[] = [];
+  for (let k = 0; k < 4; k++) {
+    const turned = [0, 1, 2, 3].map((i) => corners[(i + k) % 4]);
+    const pts = [bilinear(turned, u0, v0), bilinear(turned, u1, v0), bilinear(turned, u1, v1), bilinear(turned, u0, v1)];
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    const padX = 0.12 * (Math.max(...xs) - Math.min(...xs));
+    const padY = 0.12 * (Math.max(...ys) - Math.min(...ys));
+    regions.push({
+      x0: Math.max(0, Math.min(...xs) - padX),
+      y0: Math.max(0, Math.min(...ys) - padY),
+      x1: Math.min(width, Math.max(...xs) + padX),
+      y1: Math.min(height, Math.max(...ys) + padY),
+    });
+  }
+  return regions;
+}

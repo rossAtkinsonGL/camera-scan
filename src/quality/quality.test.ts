@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { evaluate, measure } from './evaluate';
-import { frameDifference, toLuma } from './image';
-import { detectMarkers } from './markers';
+import { cropFrame, frameDifference, toLuma, type FrameData } from './image';
+import { detectMarkers, qrSearchRegions } from './markers';
 import { decodeQr } from './qr';
 import { sheetPayload } from './sheetLayout';
 import { boxBlur, renderSheet } from './testing/syntheticSheet';
@@ -64,6 +64,52 @@ describe('QR decoding', () => {
 
   it('returns null when there is no QR code', () => {
     expect(decodeQr(renderSheet({ ...PORTRAIT, scale: 0.01 }))).toBeNull();
+  });
+});
+
+/** Darkens rows and columns in a fine grid, like the pixel pattern you see photographing a screen. */
+function addScreenLines(f: FrameData, period: number, amp: number): FrameData {
+  const d = new Uint8ClampedArray(f.data);
+  for (let y = 0; y < f.height; y++) {
+    for (let x = 0; x < f.width; x++) {
+      const m =
+        1 -
+        amp * (0.5 + 0.5 * Math.sin((2 * Math.PI * y) / period)) -
+        amp * (0.5 + 0.5 * Math.sin((2 * Math.PI * x) / (period + 1.7)));
+      const i = (y * f.width + x) * 4;
+      d[i] *= m;
+      d[i + 1] *= m;
+      d[i + 2] *= m;
+    }
+  }
+  return { data: d, width: f.width, height: f.height };
+}
+
+describe('QR search regions', () => {
+  const payload = sheetPayload('MATH-U3', 'A', 'S001');
+
+  for (const [name, opts] of [
+    ['upright', {}],
+    ['turned 90 degrees', { rotate90: true }],
+    ['turned by hand', { rotateDeg: 15 }],
+  ] as const) {
+    it('finds the QR code by cropping near the sheet, ' + name, () => {
+      const frame = renderSheet({ ...PORTRAIT, scale: 1.45, payload, ...opts });
+      const markers = detectMarkers(toLuma(frame), frame.width, frame.height)!;
+      expect(markers).not.toBeNull();
+      const found = qrSearchRegions(markers.corners, frame.width, frame.height).map((r) =>
+        decodeQr(cropFrame(frame, { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 })),
+      );
+      expect(found).toContain(payload);
+    });
+  }
+});
+
+describe('QR decoding through screen line patterns', () => {
+  it('reads a QR code photographed through a fine screen line pattern', () => {
+    const payload = sheetPayload('MATH-U3', 'A', 'S001');
+    const frame = addScreenLines(renderSheet({ width: 1080, height: 1500, scale: 900 / 210, payload }), 3, 0.5);
+    expect(decodeQr(frame)).toBe(payload);
   });
 });
 

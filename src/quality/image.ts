@@ -118,3 +118,47 @@ export function otsuThreshold(luma: Uint8Array): number {
   }
   return best;
 }
+
+/** A copy of the frame cropped to the given region. */
+export function cropFrame(frame: FrameData, region: Region): FrameData {
+  const r = clampRegion(region, frame.width, frame.height);
+  const width = Math.max(0, r.x1 - r.x0);
+  const height = Math.max(0, r.y1 - r.y0);
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const from = ((r.y0 + y) * frame.width + r.x0) * 4;
+    data.set(frame.data.subarray(from, from + width * 4), y * width * 4);
+  }
+  return { data, width, height };
+}
+
+/** Grayscale copy of the frame, smoothed with a box filter of the given radius. Hides screen line patterns. */
+export function blurredGray(luma: Uint8Array, width: number, height: number, radius: number): FrameData {
+  const tmp = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let sum = 0;
+      let n = 0;
+      for (let k = Math.max(0, x - radius); k <= Math.min(width - 1, x + radius); k++) {
+        sum += luma[y * width + k];
+        n++;
+      }
+      tmp[y * width + x] = sum / n;
+    }
+  }
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let sum = 0;
+      let n = 0;
+      for (let k = Math.max(0, y - radius); k <= Math.min(height - 1, y + radius); k++) {
+        sum += tmp[k * width + x];
+        n++;
+      }
+      const i = (y * width + x) * 4;
+      data[i] = data[i + 1] = data[i + 2] = sum / n;
+      data[i + 3] = 255;
+    }
+  }
+  return { data, width, height };
+}

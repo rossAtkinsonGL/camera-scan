@@ -63,7 +63,7 @@ export const ISSUE_MESSAGES: Record<QualityIssue, string> = {
   glare: 'Reduce glare on the page',
   blurry: 'Image is blurry, hold steady or let it focus',
   unsteady: 'Hold still',
-  'qr-not-readable': 'Cannot read the QR code yet',
+  'qr-not-readable': 'Cannot read the QR code yet. Move closer or hold steady until it is sharp',
 };
 
 export interface MeasureInput {
