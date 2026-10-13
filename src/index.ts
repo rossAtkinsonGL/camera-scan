@@ -7,3 +7,5 @@ export { analyzeBlob } from './quality/browser';
 export { ISSUE_MESSAGES, DEFAULT_THRESHOLDS } from './quality/evaluate';
 export type { QualityIssue, QualityReport, QualityMetrics, QualityThresholds } from './quality/evaluate';
 export type { CaptureResult, RawCapture, CameraError, CameraErrorCode } from './types';
+export { toScorableResponse } from './mock-backend/omr';
+export type { SheetReading, AnswerRead, AnswerStatus, ScorableResponse, SheetId } from './mock-backend/omr';

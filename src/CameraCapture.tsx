@@ -28,6 +28,11 @@ export interface CameraCaptureProps {
   autoCapture?: boolean;
   /** Expect an answer sheet with four corner squares and a QR code. Defaults to true. */
   expectSheet?: boolean;
+  /**
+   * Read the filled-in bubbles into question and answer data (result.reading). This stands in for
+   * a server-side step, see src/mock-backend. Needs expectSheet. Defaults to true.
+   */
+  readAnswers?: boolean;
   /** Override the quality thresholds. */
   qualityThresholds?: Partial<QualityThresholds>;
   /** Show the live measurements, for tuning thresholds on a device. */
@@ -58,6 +63,7 @@ export function CameraCapture({
   allowUpload = true,
   autoCapture = true,
   expectSheet = true,
+  readAnswers = true,
   qualityThresholds,
   debug = false,
   className,
@@ -77,7 +83,7 @@ export function CameraCapture({
   const armedRef = useRef(true);
   const lastQrRef = useRef<string | null>(null);
   const takePhotoRef = useRef<() => Promise<void>>(async () => undefined);
-  const evalOptions = { expectSheet, thresholds: qualityThresholds };
+  const evalOptions = { expectSheet, thresholds: qualityThresholds, readAnswers: expectSheet && readAnswers };
   const evalOptionsRef = useRef(evalOptions);
   useEffect(() => {
     itemsRef.current = items;
@@ -115,7 +121,13 @@ export function CameraCapture({
 
   const finalize = async (raw: RawCapture): Promise<CaptureResult> => {
     const analysis = await analyzeBlob(raw.blob, evalOptionsRef.current);
-    return { ...raw, id: makeId(), qr: analysis?.qr ?? undefined, quality: analysis?.quality };
+    return {
+      ...raw,
+      id: makeId(),
+      qr: analysis?.qr ?? undefined,
+      quality: analysis?.quality,
+      reading: analysis?.reading,
+    };
   };
 
   const addItem = (result: CaptureResult) => {
@@ -256,6 +268,14 @@ export function CameraCapture({
         </div>
         <div className="cs-info">
           {viewing.result.qr && <p className="cs-chip">QR: {viewing.result.qr}</p>}
+          {viewing.result.reading && (
+            <p className="cs-chip">
+              Answers read: {viewing.result.reading.summary.answered} answered, {viewing.result.reading.summary.blank}{' '}
+              blank
+              {viewing.result.reading.summary.multiple + viewing.result.reading.summary.unclear > 0 &&
+                `, ${viewing.result.reading.summary.multiple + viewing.result.reading.summary.unclear} need checking`}
+            </p>
+          )}
           {q && !q.ok && (
             <ul className="cs-issues">
               {q.issues.map((issue) => (

@@ -11,9 +11,11 @@ export interface SheetRenderOptions {
   centerX?: number;
   centerY?: number;
   payload?: string;
+  /** Selected options per question (0-based); empty array = blank, two entries = double mark. Default: the mock answers. */
+  answers?: number[][];
   /** Index (TL, TR, BL, BR) of a corner bracket to leave off the page. */
   omitMarker?: number;
-  /** Narrowing of the top edge relative to the bottom, e.g. 0.2 simulates a tilted camera. */
+  /** Perspective tilt, e.g. 0.2 simulates a camera leaning over the page (far edge about 10% smaller). */
   keystone?: number;
   /** Rotate the page by 90 degrees (landscape phone). */
   rotate90?: boolean;
@@ -31,7 +33,7 @@ export function renderSheet(opts: SheetRenderOptions): FrameData {
   const qr = QRCode.create(payload, { errorCorrectionLevel: 'M' });
   const n = qr.modules.size;
   const cell = SHEET.qr.size / (n + 8); // 4-module quiet zone on each side
-  const answers = mockAnswers(payload);
+  const answers = opts.answers ?? mockAnswers(payload).map((a) => [a]);
   const bubbleList = bubbles();
   const brackets = bracketRects().filter((_, i) => i !== opts.omitMarker).flat();
   const angle = ((opts.rotateDeg ?? 0) * Math.PI) / 180;
@@ -47,10 +49,13 @@ export function renderSheet(opts: SheetRenderOptions): FrameData {
       let dy = py - cy;
       if (opts.rotate90) [dx, dy] = [dy, -dx];
       if (angle !== 0) [dx, dy] = [dx * cos + dy * sin, -dx * sin + dy * cos];
-      // Keystone: rows nearer the top of the frame are drawn narrower.
-      const rowScale = scale * (1 + keystone * (dy / height));
-      const x = dx / rowScale + SHEET.width / 2;
-      const y = dy / scale + SHEET.height / 2;
+      // Tilt: a true perspective view, like a camera leaning over the page. Points lower on the
+      // sheet are further away and shrink: u = s*X/(1+aY), v = s*Y/(1+aY). Inverted here.
+      const a = keystone / SHEET.height;
+      const denom = scale - a * dy;
+      const sheetY = denom > 0 ? dy / denom : NaN;
+      const x = (dx * (1 + a * sheetY)) / scale + SHEET.width / 2;
+      const y = sheetY + SHEET.height / 2;
       let v = bg;
       if (x >= 0 && x < SHEET.width && y >= 0 && y < SHEET.height) {
         v = 245;
@@ -67,7 +72,7 @@ export function renderSheet(opts: SheetRenderOptions): FrameData {
           for (const b of y > 90 && y < 260 ? bubbleList : []) {
             const d = Math.hypot(x - b.cx, y - b.cy);
             if (d > BUBBLE.radius + 0.4) continue;
-            const filled = answers[b.question - 1] === b.option;
+            const filled = answers[b.question - 1].includes(b.option);
             if (filled ? d <= BUBBLE.radius : d >= BUBBLE.radius - 0.4) v = 20;
             break;
           }

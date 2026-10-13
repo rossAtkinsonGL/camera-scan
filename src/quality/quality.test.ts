@@ -49,7 +49,7 @@ describe('marker detection', () => {
   });
 
   it('reports lower skew when the camera is tilted', () => {
-    const tilted = analyse(renderSheet({ ...PORTRAIT, keystone: 0.3 }));
+    const tilted = analyse(renderSheet({ ...PORTRAIT, scale: 1.45, keystone: 0.3 }));
     expect(tilted.markers).not.toBeNull();
     expect(tilted.markers!.skew).toBeLessThan(0.85);
     expect(tilted.report.issues).toContain('sheet-skewed');

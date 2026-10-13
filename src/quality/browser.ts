@@ -1,7 +1,8 @@
 import { evaluate, measure, type EvaluateOptions, type QualityReport } from './evaluate';
 import { toLuma, type FrameData } from './image';
 import { detectMarkers, qrSearchRegions, type MarkerResult } from './markers';
-import { decodeQr } from './qr';
+import { readAnswers, type SheetReading } from '../mock-backend/omr';
+import { decodeQr, type QrHit } from './qr';
 
 /** Longest side of the frame used for sharpness, brightness and marker checks. */
 export const ANALYSIS_SIZE = 640;
@@ -9,6 +10,8 @@ export const ANALYSIS_SIZE = 640;
 export const QR_SIZE = 1600;
 /** Longest side of a cropped QR decode. Crops are taken at the camera's native resolution. */
 const QR_CROP_MAX = 700;
+/** Longest side of the copy the bubbles are read from. */
+const READ_SIZE = 1600;
 
 export function createCanvas(): HTMLCanvasElement {
   return document.createElement('canvas');
@@ -37,7 +40,8 @@ export function grabFrame(
 /**
  * Reads the sheet's QR code by cropping where it should be (from the sheet outline) out of the
  * full-resolution source, instead of decoding a shrunken copy of the whole frame. Tries every
- * way up the sheet could be. Marker coordinates are in the analysed frame (fw x fh).
+ * way up the sheet could be, and reports which one worked. Marker coordinates are in the
+ * analysed frame (fw x fh).
  */
 export function decodeQrNearSheet(
   source: CanvasImageSource,
@@ -47,12 +51,14 @@ export function decodeQrNearSheet(
   fw: number,
   fh: number,
   canvas: HTMLCanvasElement,
-): string | null {
+): QrHit | null {
   const kx = sourceWidth / fw;
   const ky = sourceHeight / fh;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
-  for (const r of qrSearchRegions(markers.corners, fw, fh)) {
+  const regions = qrSearchRegions(markers.corners, fw, fh);
+  for (let k = 0; k < regions.length; k++) {
+    const r = regions[k];
     const sx = r.x0 * kx;
     const sy = r.y0 * ky;
     const sw = (r.x1 - r.x0) * kx;
@@ -62,8 +68,8 @@ export function decodeQrNearSheet(
     canvas.width = Math.max(1, Math.round(sw * scale));
     canvas.height = Math.max(1, Math.round(sh * scale));
     ctx.drawImage(source, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-    const decoded = decodeQr(ctx.getImageData(0, 0, canvas.width, canvas.height));
-    if (decoded) return decoded;
+    const text = decodeQr(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    if (text) return { text, rotation: k as QrHit['rotation'] };
   }
   return null;
 }
@@ -72,10 +78,17 @@ export interface StillAnalysis {
   quality: QualityReport;
   /** QR payload read from the image, if any. */
   qr: string | null;
+  /** The answers read from the bubbles. Only when requested, and the sheet and its QR code were found. */
+  reading?: SheetReading;
+}
+
+export interface AnalyzeOptions extends EvaluateOptions {
+  /** Also read the filled-in bubbles. Needs the sheet outline and QR code. Default false. */
+  readAnswers?: boolean;
 }
 
 /** Analyses a captured or uploaded image. Resolves to null if it cannot be decoded. */
-export async function analyzeBlob(blob: Blob, options: EvaluateOptions = {}): Promise<StillAnalysis | null> {
+export async function analyzeBlob(blob: Blob, options: AnalyzeOptions = {}): Promise<StillAnalysis | null> {
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(blob);
@@ -88,15 +101,27 @@ export async function analyzeBlob(blob: Blob, options: EvaluateOptions = {}): Pr
     if (!small) return null;
     const luma = toLuma(small);
     const markers = detectMarkers(luma, small.width, small.height);
-    let qr = markers
+    const hit = markers
       ? decodeQrNearSheet(bitmap, bitmap.width, bitmap.height, markers, small.width, small.height, createCanvas())
       : null;
+    let qr = hit?.text ?? null;
     if (!qr) {
       const large = grabFrame(bitmap, bitmap.width, bitmap.height, QR_SIZE, canvas);
       qr = large ? decodeQr(large) : null;
     }
     const quality = evaluate(measure({ luma, width: small.width, height: small.height, markers, qr }), options);
-    return { quality, qr };
+
+    let reading: SheetReading | undefined;
+    if (options.readAnswers && markers && hit) {
+      // Bubbles are small, so read them from a higher-resolution copy than the one used to find the sheet.
+      const large = grabFrame(bitmap, bitmap.width, bitmap.height, READ_SIZE, canvas);
+      if (large) {
+        const k = large.width / small.width;
+        const corners = markers.corners.map((p) => ({ x: p.x * k, y: p.y * k })) as MarkerResult['corners'];
+        reading = readAnswers(large, corners, hit.rotation, hit.text) ?? undefined;
+      }
+    }
+    return { quality, qr, reading };
   } finally {
     bitmap.close();
   }

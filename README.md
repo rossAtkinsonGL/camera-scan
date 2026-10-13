@@ -26,6 +26,21 @@ Props: `onComplete`, `onError?`, `maxCaptures?` (1 = single capture; default unl
 `expectSheet?` (default true), `qualityThresholds?`, `debug?`, `facingMode?`, `allowUpload?`, `className?`.
 React is a peer dependency.
 
+## Output: question and answer data
+
+Each result has a `reading` (when the sheet outline and QR code were recognised). `toScorableResponse(result.reading)`
+gives the plain data:
+
+```json
+{ "assessment": "MATH-U3", "form": "A", "student": "S001",
+  "responses": [{ "question": 1, "answer": "B" }, { "question": 2, "answer": null }] }
+```
+
+`answer` is `null` for a blank, a double mark or an unclear mark; the fuller `reading` says which, with a confidence.
+The reading code lives in `src/mock-backend/` because it stands in for a server step (see the README there).
+The demo shows the table and JSON for each scan, and for the mock sheets checks them against the known answers.
+Turn it off with `readAnswers={false}`.
+
 ## Answer sheet requirements (what the detector relies on)
 
 - Four **L-shaped corner brackets**, one per page corner, all the same size, with the outer corner of each L pointing at

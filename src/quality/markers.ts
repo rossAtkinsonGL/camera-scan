@@ -43,7 +43,7 @@ const MAX_ASPECT = 1.67;
 const MIN_BRACKET_FRAC = 0.012; // bracket size as a fraction of the longer frame side
 const MAX_BRACKET_FRAC = 0.2;
 const MAX_CANDIDATES = 12;
-const MIN_SIZE_RATIO = 0.75; // smallest / largest bracket in a group
+const MIN_SIZE_RATIO = 0.55; // smallest / largest bracket in a group (a tilted sheet shrinks the far ones)
 const MIN_AREA_FRACTION = 0.08; // below this we treat the sheet as not found; evaluate() flags "too small" earlier
 // Reference sheet: bracket corners are 190mm x 277mm apart.
 const SHEET_RATIO = (SHEET.width - 2 * SHEET.bracket.inset) / (SHEET.height - 2 * SHEET.bracket.inset);

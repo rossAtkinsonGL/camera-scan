@@ -1,4 +1,5 @@
 import type { QualityReport } from './quality/evaluate';
+import type { SheetReading } from './mock-backend/omr';
 
 /** An image straight from the camera or a file, before analysis. */
 export interface RawCapture {
@@ -17,6 +18,8 @@ export interface CaptureResult extends RawCapture {
   qr?: string;
   /** Client-side quality checks. Advisory: the server makes the final call. */
   quality?: QualityReport;
+  /** The answers read from the filled-in bubbles, when the sheet and its QR code were recognised. */
+  reading?: SheetReading;
 }
 
 export type CameraErrorCode =

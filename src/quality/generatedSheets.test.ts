@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { evaluate, measure } from './evaluate';
 import { toLuma, type FrameData } from './image';
 import { detectMarkers } from './markers';
-import { decodeQr } from './qr';
-import { sheetPayload } from './sheetLayout';
+import { readAnswers } from '../mock-backend/omr';
+import { decodeQr, decodeQrWithRotation } from './qr';
+import { mockAnswers, sheetPayload } from './sheetLayout';
 
 const SHEETS = join(process.cwd(), 'demo', 'public', 'sheets');
 
@@ -78,4 +79,26 @@ describe('generated mock sheets', () => {
     const large = rasterise('sheet-bad-missing-marker', 640, 860, 600);
     expect(decodeQr(large), describeFrame(large)).toBe(sheetPayload('MATH-U3', 'A', 'S006'));
   });
+});
+
+describe('reading answers from the generated mock sheets', () => {
+  for (const [file, student] of [
+    ['sheet-S001', 'S001'],
+    ['sheet-S002', 'S002'],
+    ['sheet-S003', 'S003'],
+    ['sheet-S004', 'S004'],
+    ['sheet-S005', 'S005'],
+  ] as const) {
+    it(file + ': every bubble is read correctly', () => {
+      const frame = rasterise(file, 640, 860, 600);
+      const markers = detectMarkers(toLuma(frame), frame.width, frame.height);
+      expect(markers, describeFrame(frame)).not.toBeNull();
+      const hit = decodeQrWithRotation(frame, markers!.corners);
+      expect(hit, describeFrame(frame)).not.toBeNull();
+      const reading = readAnswers(frame, markers!.corners, hit!.rotation, hit!.text)!;
+      const expected = mockAnswers(hit!.text).map((o) => 'ABCD'[o]);
+      expect(reading.sheet.student).toBe(student);
+      expect(reading.answers.map((a) => a.answer)).toEqual(expected);
+    });
+  }
 });

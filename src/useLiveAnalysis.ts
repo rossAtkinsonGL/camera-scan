@@ -64,7 +64,7 @@ export function useLiveAnalysis(
 
           // QR decoding is the most expensive step, so only try now and then, and only once the sheet is in view.
           if (markers && tick % QR_EVERY_N_TICKS === 0) {
-            const decoded = decodeQrNearSheet(
+            const hit = decodeQrNearSheet(
               video,
               video.videoWidth,
               video.videoHeight,
@@ -73,8 +73,8 @@ export function useLiveAnalysis(
               frame.height,
               large,
             );
-            if (decoded) {
-              qr = decoded;
+            if (hit) {
+              qr = hit.text;
               qrSeenAt = performance.now();
             }
           }
