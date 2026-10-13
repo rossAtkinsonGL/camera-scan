@@ -1,0 +1,76 @@
+# Builds and verifies camera-scan, then deploys the demo app to Azure Static Web Apps.
+# Deployment only runs for builds of main. Pull requests run build + checks only.
+#
+# One-time setup: see README.md ("Deploying to Azure").
+# Required: a pipeline variable (or variable group) secret named SWA_DEPLOYMENT_TOKEN.
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  nodeVersion: '22.x'
+
+stages:
+  - stage: Build
+    displayName: Build and verify
+    jobs:
+      - job: build
+        steps:
+          - task: NodeTool@0
+            displayName: Use Node $(nodeVersion)
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: npm ci
+            displayName: Install dependencies
+
+          - script: npm run lint
+            displayName: Lint
+
+          - script: npm run typecheck
+            displayName: Typecheck
+
+          - script: npm test
+            displayName: Unit tests
+
+          - script: npm run build
+            displayName: Build library
+
+          - script: npm run build:demo
+            displayName: Build demo app
+
+          - publish: $(Build.SourcesDirectory)/dist-demo
+            artifact: demo-site
+            displayName: Publish demo site artifact
+
+  - stage: Deploy
+    displayName: Deploy to Azure Static Web Apps
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - job: deploy
+        steps:
+          - checkout: none
+
+          - download: current
+            artifact: demo-site
+            displayName: Download demo site artifact
+
+          - task: AzureStaticWebApp@0
+            displayName: Deploy to Static Web App
+            inputs:
+              # The artifact is already built, so only upload it.
+              app_location: '$(Pipeline.Workspace)/demo-site'
+              skip_app_build: true
+              skip_api_build: true
+              azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)
