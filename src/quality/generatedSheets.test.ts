@@ -38,6 +38,19 @@ function rasterise(file: string, frameW: number, frameH: number, sheetW: number)
   return { data, width: frameW, height: frameH };
 }
 
+/** Facts about a frame, to put in assertion messages so a CI-only failure explains itself. */
+function describeFrame(f: FrameData): string {
+  const luma = toLuma(f);
+  let dark = 0;
+  let sum = 0;
+  for (const v of luma) {
+    sum += v;
+    if (v < 100) dark++;
+  }
+  const pct = (n: number) => ((n / luma.length) * 100).toFixed(1);
+  return `frame ${f.width}x${f.height}, mean luma ${(sum / luma.length).toFixed(1)}, dark ${pct(dark)}%, platform ${process.platform}`;
+}
+
 describe('generated mock sheets', () => {
   const good = [
     ['sheet-S001', sheetPayload('MATH-U3', 'A', 'S001')],
@@ -50,8 +63,8 @@ describe('generated mock sheets', () => {
       const small = rasterise(file, 480, 640, 440);
       const markers = detectMarkers(toLuma(small), small.width, small.height);
       expect(markers).not.toBeNull();
-      const large = rasterise(file, 960, 1280, 880);
-      expect(decodeQr(large)).toBe(payload);
+      const large = rasterise(file, 640, 860, 600);
+      expect(decodeQr(large), describeFrame(large)).toBe(payload);
       const report = evaluate(
         measure({ luma: toLuma(small), width: small.width, height: small.height, markers, qr: payload }),
       );
@@ -62,7 +75,7 @@ describe('generated mock sheets', () => {
   it('sheet-bad-missing-marker: no sheet found (even with filled bubbles around), but the QR is still readable', () => {
     const small = rasterise('sheet-bad-missing-marker', 480, 640, 440);
     expect(detectMarkers(toLuma(small), small.width, small.height)).toBeNull();
-    const large = rasterise('sheet-bad-missing-marker', 960, 1280, 880);
-    expect(decodeQr(large)).toBe(sheetPayload('MATH-U3', 'A', 'S006'));
+    const large = rasterise('sheet-bad-missing-marker', 640, 860, 600);
+    expect(decodeQr(large), describeFrame(large)).toBe(sheetPayload('MATH-U3', 'A', 'S006'));
   });
 });

@@ -15,5 +15,7 @@ export default defineConfig({
     root: '.',
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
+    // Image tests do per-pixel work in JS; CI runners are slower than a dev machine.
+    testTimeout: 30000,
   },
 });

@@ -108,7 +108,7 @@ describe('QR search regions', () => {
 describe('QR decoding through screen line patterns', () => {
   it('reads a QR code photographed through a fine screen line pattern', () => {
     const payload = sheetPayload('MATH-U3', 'A', 'S001');
-    const frame = addScreenLines(renderSheet({ width: 1080, height: 1500, scale: 900 / 210, payload }), 3, 0.5);
+    const frame = addScreenLines(renderSheet({ width: 720, height: 1000, scale: 640 / 210, payload }), 3, 0.5);
     expect(decodeQr(frame)).toBe(payload);
   });
 });
