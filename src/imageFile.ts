@@ -1,7 +1,7 @@
-import type { CaptureResult } from './types';
+import type { RawCapture } from './types';
 
-/** Converts an uploaded image file into a CaptureResult (reads its dimensions). */
-export async function fileToCaptureResult(file: File): Promise<CaptureResult> {
+/** Converts an uploaded image file into a RawCapture (reads its dimensions). */
+export async function fileToCaptureResult(file: File): Promise<RawCapture> {
   if (!file.type.startsWith('image/')) {
     throw new Error('Selected file is not an image.');
   }

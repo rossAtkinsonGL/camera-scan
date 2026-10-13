@@ -16,11 +16,29 @@ npm run dev:https    # self-signed HTTPS on the LAN, for testing the camera from
 import { CameraCapture } from 'camera-scan';
 import 'camera-scan/style.css';
 
-<CameraCapture onCapture={({ blob, width, height, mimeType, source }) => upload(blob)} />
+<CameraCapture onComplete={(sheets) => sheets.forEach((s) => upload(s.blob, s.qr))} />
 ```
 
-Props: `onCapture`, `onError?`, `facingMode?` (`'environment'` default), `allowUpload?` (default `true`), `className?`.
+The user captures one or many sheets, then taps Done. Each result has `blob`, `width`, `height`, `mimeType`, `source`,
+`qr` (text of the QR code, if read) and `quality` (advisory client-side checks; the server decides).
+
+Props: `onComplete`, `onError?`, `maxCaptures?` (1 = single capture; default unlimited), `autoCapture?` (default true),
+`expectSheet?` (default true), `qualityThresholds?`, `debug?`, `facingMode?`, `allowUpload?`, `className?`.
 React is a peer dependency.
+
+## Answer sheet requirements (what the detector relies on)
+
+- Four **L-shaped corner brackets**, one per page corner, all the same size, with the outer corner of each L pointing at
+  the page corner (14mm arms, 3mm thick, 10mm in from the edge on the mock sheets). Thin arms blur away at a distance,
+  so keep them at least 3mm thick.
+- A **QR code** with a quiet zone (white margin).
+- The brackets give an accurate page outline but **not the sheet's orientation** (a sheet turned 180 degrees looks the
+  same). Orientation has to come from the QR code's position, or from making one bracket different.
+
+Detection copes with the sheet turned by up to about 25 degrees; beyond that an L starts to look like a V.
+
+Mock sheets: `npm run sheets` regenerates `demo/public/sheets/` (PDF, PNG, SVG; one is deliberately broken).
+The demo links to them at `/sheets/`. Add `?debug` to the demo URL to see live measurements for tuning thresholds.
 
 ## Scripts
 

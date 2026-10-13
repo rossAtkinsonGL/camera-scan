@@ -67,3 +67,157 @@
   background: var(--cs-accent);
   border-color: var(--cs-accent);
 }
+
+/* Live guidance */
+.cs-stage {
+  border: 3px solid transparent;
+}
+.cs-stage-ok {
+  border-color: #16a34a;
+}
+.cs-stage-warn {
+  border-color: #d97706;
+}
+.cs-overlay-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.cs-quad {
+  fill: none;
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+.cs-quad-ok {
+  stroke: #22c55e;
+  fill: rgba(34, 197, 94, 0.12);
+}
+.cs-quad-warn {
+  stroke: #f59e0b;
+}
+.cs-guide {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  color: #fff;
+  font-size: 14px;
+  text-align: center;
+  background: rgba(180, 83, 9, 0.85);
+  border-radius: 6px;
+}
+.cs-guide-ok {
+  background: rgba(21, 128, 61, 0.9);
+}
+.cs-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 6px;
+  background: #22c55e;
+  transition: width 0.12s linear;
+}
+.cs-qr-chip,
+.cs-chip {
+  margin: 0;
+  padding: 4px 8px;
+  color: #fff;
+  font-size: 12px;
+  background: rgba(17, 24, 39, 0.8);
+  border-radius: 4px;
+  word-break: break-all;
+}
+.cs-qr-chip {
+  position: absolute;
+  bottom: 12px;
+  left: 8px;
+  max-width: calc(100% - 16px);
+}
+.cs-chip {
+  display: inline-block;
+  color: #1f2937;
+  background: #e5e7eb;
+}
+.cs-debug {
+  position: absolute;
+  bottom: 40px;
+  right: 8px;
+  margin: 0;
+  padding: 4px 8px;
+  color: #a7f3d0;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+}
+
+/* Tray of captured sheets */
+.cs-tray {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0 0 4px;
+  overflow-x: auto;
+  list-style: none;
+}
+.cs-thumb {
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 72px;
+  padding: 0;
+  overflow: hidden;
+  background: #111;
+  border: 2px solid;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.cs-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cs-thumb-ok {
+  border-color: #16a34a;
+}
+.cs-thumb-warn {
+  border-color: #d97706;
+}
+.cs-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  background: #374151;
+  border-radius: 50%;
+}
+.cs-thumb-ok .cs-badge {
+  background: #16a34a;
+}
+.cs-thumb-warn .cs-badge {
+  background: #d97706;
+}
+
+.cs-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cs-issues {
+  margin: 0;
+  padding-left: 20px;
+  color: #92400e;
+}
+.cs-ok {
+  margin: 0;
+  color: #15803d;
+}

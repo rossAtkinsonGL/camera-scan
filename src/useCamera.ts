@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { checkCameraSupport, toCameraError } from './cameraErrors';
-import type { CameraError, CaptureResult } from './types';
+import type { CameraError, RawCapture } from './types';
 
 export type FacingMode = 'environment' | 'user';
 export type CameraStatus = 'idle' | 'starting' | 'ready' | 'error';
@@ -13,7 +13,7 @@ export interface UseCamera {
   start: (facing?: FacingMode) => Promise<void>;
   stop: () => void;
   toggleFacing: () => Promise<void>;
-  capture: () => Promise<CaptureResult>;
+  capture: () => Promise<RawCapture>;
 }
 
 const JPEG_QUALITY = 0.92;
@@ -83,7 +83,7 @@ export function useCamera(initialFacing: FacingMode = 'environment'): UseCamera 
     [start, facingMode],
   );
 
-  const capture = useCallback(async (): Promise<CaptureResult> => {
+  const capture = useCallback(async (): Promise<RawCapture> => {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0) throw new Error('Camera is not ready.');
     const canvas = document.createElement('canvas');
