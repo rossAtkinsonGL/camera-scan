@@ -54,14 +54,42 @@ function qrModules(payload: string) {
   return { dark, cell };
 }
 
+/** Left edge and baseline (mm) and font size (mm) of each text line, in labelsFor order. */
+const LABEL_LAYOUT = {
+  title: { x: 24, y: 26, size: 7 },
+  sub: { x: 24, y: 34, size: 4.5 },
+  name: { x: 24, y: 52, size: 4.5 },
+  id: { x: 24, y: 60, size: 4.5 },
+  note: { x: 24, y: 72, size: 3.2 },
+} as const;
+
+/**
+ * Fonts differ between machines (Arial here, a wider fallback on Linux), so a line that only just
+ * clears the QR code on one machine can run into it on another. Assume a wide font (0.75em per
+ * character) and refuse to generate a sheet where text beside the QR code could reach it.
+ */
+function assertClearOfQr(labels: Record<keyof typeof LABEL_LAYOUT, string>) {
+  const quietGap = 4;
+  for (const key of Object.keys(LABEL_LAYOUT) as (keyof typeof LABEL_LAYOUT)[]) {
+    const { x, y, size } = LABEL_LAYOUT[key];
+    const beside = y > SHEET.qr.y && y - size < SHEET.qr.y + SHEET.qr.size;
+    const widest = x + labels[key].length * size * 0.75;
+    if (beside && widest > SHEET.qr.x - quietGap) {
+      throw new Error(`Text "${labels[key]}" could run into the QR code (needs ${widest.toFixed(0)}mm, limit ${SHEET.qr.x - quietGap}mm).`);
+    }
+  }
+}
+
 function labelsFor(spec: SheetSpec) {
-  return {
-    title: 'Mock Assessment Answer Sheet',
+  const labels = {
+    title: 'Mock Answer Sheet',
     sub: `${spec.assessment}  |  Form ${spec.form}`,
     name: `Name: ${spec.student}`,
     id: `Student ID: ${spec.studentId}`,
     note: 'MOCK SHEET for camera testing. Fill bubbles completely.',
   };
+  assertClearOfQr(labels);
+  return labels;
 }
 
 function svgFor(spec: SheetSpec, payload: string): string {
