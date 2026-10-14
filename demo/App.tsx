@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CameraCapture, toScorableResponse, type CaptureResult, type SheetReading } from '../src';
+import { CameraCapture, toScorableResponse, type AnswerRead, type CaptureResult, type SheetReading } from '../src';
 import { mockAnswers } from '../src/quality/sheetLayout';
 
 const params = new URLSearchParams(window.location.search);
@@ -24,11 +24,32 @@ function checkAgainstMock(reading: SheetReading) {
   return { total: expected.length, wrong: wrong.map((a) => a.question), expected };
 }
 
-function Reading({ reading }: { reading: SheetReading }) {
-  const check = checkAgainstMock(reading);
+/** What a chip says: the letter, or why there isn't one. */
+function chipLabel(a: AnswerRead): { text: string; tone: 'ok' | 'quiet' | 'warn' } {
+  if (a.answer) return { text: a.answer, tone: 'ok' };
+  if (a.status === 'multiple') return { text: a.marked.join('+'), tone: 'warn' };
+  if (a.status === 'unclear') return { text: 'faint?', tone: 'warn' };
+  return { text: 'blank', tone: 'quiet' };
+}
+
+const TONES = {
+  ok: { border: '#9ca3af', background: '#f3f4f6', color: '#111' },
+  quiet: { border: '#d1d5db', background: '#f9fafb', color: '#6b7280' },
+  warn: { border: '#b45309', background: '#fef3c7', color: '#92400e' },
+  bad: { border: '#b91c1c', background: '#fee2e2', color: '#111' },
+};
+
+function Reading({ reading, compare }: { reading: SheetReading; compare: boolean }) {
+  const check = compare ? checkAgainstMock(reading) : null;
   const json = JSON.stringify(toScorableResponse(reading), null, 2);
+  const { summary } = reading;
   return (
     <div style={{ fontSize: 13, marginTop: 8 }}>
+      <p style={{ margin: '4px 0' }}>
+        {summary.answered} answered, {summary.blank} blank
+        {summary.unclear > 0 && <strong style={{ color: TONES.warn.color }}>, {summary.unclear} unclear (faint mark)</strong>}
+        {summary.multiple > 0 && <strong style={{ color: TONES.warn.color }}>, {summary.multiple} with more than one mark</strong>}
+      </p>
       {check && (
         <p style={{ margin: '4px 0', fontWeight: 600, color: check.wrong.length === 0 ? '#15803d' : '#b91c1c' }}>
           {check.wrong.length === 0
@@ -38,19 +59,21 @@ function Reading({ reading }: { reading: SheetReading }) {
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 4, maxWidth: 420 }}>
         {reading.answers.map((a, i) => {
-          const bad = check ? a.answer !== check.expected[i] : a.status !== 'answered';
+          const label = chipLabel(a);
+          const tone = check && a.answer !== check.expected[i] ? TONES.bad : TONES[label.tone];
           return (
             <span
               key={a.question}
               title={`${a.status}, confidence ${a.confidence.toFixed(2)}${a.marked.length ? `, marked ${a.marked.join('')}` : ''}`}
               style={{
                 padding: '2px 6px',
-                border: `1px solid ${bad ? '#b91c1c' : '#9ca3af'}`,
-                background: bad ? '#fee2e2' : '#f3f4f6',
+                border: `1px solid ${tone.border}`,
+                background: tone.background,
+                color: tone.color,
                 borderRadius: 4,
               }}
             >
-              {a.question}: <strong>{a.answer ?? (a.status === 'multiple' ? a.marked.join('+') : '–')}</strong>
+              {a.question}: {label.tone === 'ok' ? <strong>{label.text}</strong> : label.text}
             </span>
           );
         })}
@@ -77,6 +100,7 @@ function downloadJson(shown: Shown[]) {
 // what to do with the results (later: send them to the scoring service).
 export function App() {
   const [shown, setShown] = useState<Shown[] | null>(null);
+  const [compare, setCompare] = useState(false);
 
   const complete = (results: CaptureResult[]) =>
     setShown(results.map((result) => ({ result, url: URL.createObjectURL(result.blob) })));
@@ -93,6 +117,10 @@ export function App() {
           <p>
             Received {shown.length} sheet{shown.length === 1 ? '' : 's'}:
           </p>
+          <label style={{ display: 'block', fontSize: 14, marginBottom: 12 }}>
+            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Compare with the
+            mock sheets&apos; known answers (only for the pre-filled sheets, not hand-marked ones)
+          </label>
           <ul style={{ padding: 0, listStyle: 'none', display: 'grid', gap: 20 }}>
             {shown.map(({ result, url }, i) => (
               <li key={result.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -110,7 +138,7 @@ export function App() {
                       : `Issues: ${result.quality?.issues.join(', ') || 'unknown'}`}
                   </div>
                   {result.reading ? (
-                    <Reading reading={result.reading} />
+                    <Reading reading={result.reading} compare={compare} />
                   ) : (
                     <div style={{ color: '#b45309' }}>No answers read (sheet outline or QR code not recognised)</div>
                   )}
