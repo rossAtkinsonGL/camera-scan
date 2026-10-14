@@ -53,7 +53,8 @@ Turn it off with `readAnswers={false}`.
 Detection copes with the sheet turned by up to about 25 degrees; beyond that an L starts to look like a V.
 
 Mock sheets: `npm run sheets` regenerates `demo/public/sheets/` (PDF, PNG, SVG; one is deliberately broken).
-The demo links to them at `/sheets/`. Add `?debug` to the demo URL to see live measurements for tuning thresholds.
+The demo links to them at `/sheets/`. The same sheets with no bubbles filled in are at `/empty-sheets/`, for printing
+and marking by hand. Add `?debug` to the demo URL to see live measurements for tuning thresholds.
 
 ## Scripts
 

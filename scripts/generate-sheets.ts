@@ -39,7 +39,13 @@ const SPECS: SheetSpec[] = [
 ];
 
 const MM_TO_PT = 72 / 25.4;
-const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'demo', 'public', 'sheets');
+const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), '..', 'demo', 'public');
+
+/** The same sheets twice: with the mock answers filled in, and empty (to print and fill in by hand). */
+const VARIANTS = [
+  { dir: 'sheets', empty: false },
+  { dir: 'empty-sheets', empty: true },
+];
 
 function qrModules(payload: string) {
   const qr = QRCode.create(payload, { errorCorrectionLevel: 'M' });
@@ -92,7 +98,7 @@ function labelsFor(spec: SheetSpec) {
   return labels;
 }
 
-function svgFor(spec: SheetSpec, payload: string): string {
+function svgFor(spec: SheetSpec, payload: string, empty: boolean): string {
   const brackets = bracketRects().filter((_, i) => i !== spec.omitMarker).flat();
   const { dark, cell } = qrModules(payload);
   const answers = mockAnswers(payload);
@@ -113,7 +119,7 @@ function svgFor(spec: SheetSpec, payload: string): string {
     ['A', 'B', 'C', 'D'].forEach((letter, o) => parts.push(`<text x="${x0 + 16 + o * 14}" y="90" font-size="3.6" text-anchor="middle">${letter}</text>`));
   }
   for (const b of bubbles()) {
-    const filled = answers[b.question - 1] === b.option;
+    const filled = !empty && answers[b.question - 1] === b.option;
     parts.push(`<circle cx="${b.cx}" cy="${b.cy}" r="${BUBBLE.radius}" fill="${filled ? '#000' : 'none'}" stroke="#000" stroke-width="0.4"/>`);
     if (b.option === 0) parts.push(`<text x="${b.cx - 13}" y="${b.cy + 1.4}" font-size="4" text-anchor="end">${b.question}</text>`);
   }
@@ -122,7 +128,7 @@ function svgFor(spec: SheetSpec, payload: string): string {
   return parts.join('\n');
 }
 
-async function pdfFor(spec: SheetSpec, payload: string): Promise<Uint8Array> {
+async function pdfFor(spec: SheetSpec, payload: string, empty: boolean): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([SHEET.width * MM_TO_PT, SHEET.height * MM_TO_PT]);
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -150,7 +156,7 @@ async function pdfFor(spec: SheetSpec, payload: string): Promise<Uint8Array> {
     ),
   );
   for (const b of bubbles()) {
-    const filled = answers[b.question - 1] === b.option;
+    const filled = !empty && answers[b.question - 1] === b.option;
     page.drawCircle({ x: X(b.cx), y: Y(b.cy), size: X(BUBBLE.radius), borderColor: black, borderWidth: 0.4 * MM_TO_PT, color: filled ? black : undefined });
     if (b.option === 0) {
       const t = String(b.question);
@@ -161,19 +167,20 @@ async function pdfFor(spec: SheetSpec, payload: string): Promise<Uint8Array> {
   return doc.save();
 }
 
-function indexHtml(): string {
+function indexHtml(empty: boolean): string {
+  const heading = empty ? 'Empty answer sheets' : 'Mock answer sheets';
   const cards = SPECS.map((s) => {
     const payload = sheetPayload(s.assessment, s.form, s.studentId);
     return `<section>
   <h2>${s.student} <small>${s.file === 'sheet-bad-missing-marker' ? '(bad sheet)' : ''}</small></h2>
   <p>QR: <code>${payload}</code>${s.note ? `<br><em>${s.note}</em>` : ''}</p>
   <p><a href="${s.file}.pdf">PDF</a> &middot; <a href="${s.file}.png">PNG</a> &middot; <a href="${s.file}.svg">SVG</a></p>
-  <a href="${s.file}.png"><img src="${s.file}.png" alt="Mock answer sheet for ${s.student}" loading="lazy"></a>
+  <a href="${s.file}.png"><img src="${s.file}.png" alt="${heading} - ${empty ? 'blank' : 'filled'} sheet for ${s.student}" loading="lazy"></a>
 </section>`;
   }).join('\n');
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mock answer sheets</title>
+<title>${heading}</title>
 <style>
 body{font-family:system-ui,sans-serif;margin:0;padding:16px;background:#e5e7eb;color:#111}
 section{max-width:720px;margin:0 auto 32px;background:#fff;padding:16px;border-radius:8px}
@@ -181,27 +188,30 @@ img{width:100%;border:1px solid #ccc}
 h1{max-width:720px;margin:0 auto 8px}
 .intro{max-width:720px;margin:0 auto 24px}
 </style></head><body>
-<h1>Mock answer sheets</h1>
-<p class="intro">Open one on a screen (turn the brightness up, avoid glare) or print it, then point the scanner app at it. Each sheet has four L-shaped corner brackets and a QR code naming the assessment, form and student. <a href="../">Back to the scanner</a></p>
+<h1>${heading}</h1>
+<p class="intro">${empty ? 'No bubbles are filled in. Print one and mark it by hand to test real answers.' : 'Open one on a screen (turn the brightness up, avoid glare) or print it, then point the scanner app at it.'} Each sheet has four L-shaped corner brackets and a QR code naming the assessment, form and student. ${empty ? '<a href="../sheets/">Sheets with answers filled in</a>' : '<a href="../empty-sheets/">Empty sheets</a>'} &middot; <a href="../">Back to the scanner</a></p>
 ${cards}
 </body></html>`;
 }
 
 async function main() {
-  mkdirSync(OUT, { recursive: true });
-  for (const spec of SPECS) {
-    const payload = sheetPayload(spec.assessment, spec.form, spec.studentId);
-    const svg = svgFor(spec, payload);
-    writeFileSync(join(OUT, `${spec.file}.svg`), svg);
-    const png = new Resvg(svg, { fitTo: { mode: 'width', value: 1654 }, background: '#ffffff', font: { loadSystemFonts: true } })
-      .render()
-      .asPng();
-    writeFileSync(join(OUT, `${spec.file}.png`), png);
-    writeFileSync(join(OUT, `${spec.file}.pdf`), await pdfFor(spec, payload));
-    console.log(`${spec.file}: ${payload}`);
+  for (const { dir, empty } of VARIANTS) {
+    const out = join(PUBLIC, dir);
+    mkdirSync(out, { recursive: true });
+    for (const spec of SPECS) {
+      const payload = sheetPayload(spec.assessment, spec.form, spec.studentId);
+      const svg = svgFor(spec, payload, empty);
+      writeFileSync(join(out, `${spec.file}.svg`), svg);
+      const png = new Resvg(svg, { fitTo: { mode: 'width', value: 1654 }, background: '#ffffff', font: { loadSystemFonts: true } })
+        .render()
+        .asPng();
+      writeFileSync(join(out, `${spec.file}.png`), png);
+      writeFileSync(join(out, `${spec.file}.pdf`), await pdfFor(spec, payload, empty));
+      console.log(`${dir}/${spec.file}: ${payload}`);
+    }
+    writeFileSync(join(out, 'index.html'), indexHtml(empty));
+    console.log(`Wrote ${SPECS.length} sheets to ${out}`);
   }
-  writeFileSync(join(OUT, 'index.html'), indexHtml());
-  console.log(`Wrote ${SPECS.length} sheets to ${OUT}`);
 }
 
 void main();
